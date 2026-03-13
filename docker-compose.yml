@@ -4,7 +4,7 @@ services:
     container_name: archipelago
     ports:
       - "5000:5000"
-
+    network_mode: host
     volumes:
       - ~/.ssh:/root/.ssh:ro
 
