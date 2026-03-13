@@ -290,19 +290,19 @@
   <div class="info-bar">
     <div class="info-pill" id="clockPill">🕐 --:--</div>
     <div class="info-pill" id="onlineCount">💻 0 online</div>
-    <div class="info-pill" id="totalCount">🏠 0 machines</div>
+    <div class="info-pill" id="totalCount">🏠 0 villagers</div>
   </div>
 
-  <div class="section-title">🌿 Your machines</div>
+  <div class="section-title">🌿 Your Villagers</div>
   <div class="grid" id="machineGrid"></div>
 
   <div class="log-card">
-    <div class="section-title" style="margin-bottom:12px">📜 Island Bulletin</div>
+    <div class="section-title" style="margin-bottom:12px">📜 Town Bulletin</div>
     <div class="log-entries" id="logEntries"></div>
   </div>
 
   <div class="add-card">
-    <div class="section-title" style="margin-bottom:16px">✨ Move In a New machine</div>
+    <div class="section-title" style="margin-bottom:16px">✨ Move In a New Villager</div>
     <div class="form-grid">
       <div class="form-group">
         <label>🏷️ Name</label>
@@ -319,6 +319,10 @@
       <div class="form-group">
         <label>📡 Tailscale IP</label>
         <input type="text" id="inputIp" placeholder="100.x.x.x">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>🔗 Link <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — e.g. http://100.x.x.x:8080)</span></label>
+        <input type="text" id="inputLink" placeholder="http://...">
       </div>
     </div>
     <div class="form-group" style="margin-bottom:14px">
@@ -388,7 +392,7 @@ function renderAll() { renderMachines(); renderLogs(); updateSummary(); }
 function renderMachines() {
   const grid = document.getElementById('machineGrid');
   if (!machines.length) {
-    grid.innerHTML = `<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a machine below.</div>`;
+    grid.innerHTML = `<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a villager below.</div>`;
     return;
   }
   grid.innerHTML = machines.map((m, i) => `
@@ -407,7 +411,9 @@ function renderMachines() {
       <div class="card-header">
         <div class="card-icon">${m.emoji||'🖥️'}</div>
         <div>
-          <div class="card-name">${m.name}</div>
+          <div class="card-name">${m.link
+            ? `<a href="${m.link}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid var(--border2);" onmouseover="this.style.borderColor='var(--grass)'" onmouseout="this.style.borderColor='var(--border2)'">${m.name} 🔗</a>`
+            : m.name}</div>
           <div class="card-role">${m.role}</div>
         </div>
       </div>
@@ -461,7 +467,7 @@ function renderLogs() {
 function updateSummary() {
   const on = machines.filter(m => m.status==='online').length;
   document.getElementById('onlineCount').textContent = `💻 ${on} online`;
-  document.getElementById('totalCount').textContent  = `🏠 ${machines.length} machine${machines.length!==1?'s':''}`;
+  document.getElementById('totalCount').textContent  = `🏠 ${machines.length} villager${machines.length!==1?'s':''}`;
 }
 
 function addLog(msg, type='ok', icon='📝') {
@@ -591,21 +597,22 @@ function addMachine() {
   const role = document.getElementById('inputRole').value.trim();
   const mac  = document.getElementById('inputMac').value.trim();
   const ip   = document.getElementById('inputIp').value.trim();
+  const link = document.getElementById('inputLink').value.trim();
   if (!name || !mac || !ip) { addLog('Fill in Name, MAC, and Tailscale IP first! 📋','err','⚠️'); return; }
-  const m = { id:nextId++, name, role:role||'Machine', mac, ip, emoji:selectedEmoji, status:'offline', ping:null };
+  const m = { id:nextId++, name, role:role||'Machine', mac, ip, link: link||'', emoji:selectedEmoji, status:'offline', ping:null };
   machines.push(m); save();
-  addLog(`${name} joined the archipelago! Welcome! 🎉`, 'ok', '🏝️');
+  addLog(`${name} moved to the archipelago! Welcome! 🎉`, 'ok', '🏝️');
   schedulePing(m.id);
-  ['inputName','inputRole','inputMac','inputIp'].forEach(id => document.getElementById(id).value = '');
+  ['inputName','inputRole','inputMac','inputIp','inputLink'].forEach(id => document.getElementById(id).value = '');
   renderAll();
 }
 
 function removeMachine(id) {
   const m = machines.find(x => x.id===id); if (!m) return;
-  if (!confirm(`Remove ${m.name} from the archipelago?`)) return;
+  if (!confirm(`Move ${m.name} off the archipelago?`)) return;
   clearInterval(pingTimers[id]); delete pingTimers[id];
   machines = machines.filter(x => x.id!==id); save();
-  addLog(`${m.name} left the archipelago. We'll miss them! 👋`, 'warn', '🏝️');
+  addLog(`${m.name} moved away. We'll miss them! 👋`, 'warn', '🏝️');
   renderAll();
 }
 </script>
