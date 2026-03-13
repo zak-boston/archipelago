@@ -290,10 +290,10 @@
   <div class="info-bar">
     <div class="info-pill" id="clockPill">🕐 --:--</div>
     <div class="info-pill" id="onlineCount">💻 0 online</div>
-    <div class="info-pill" id="totalCount">🏠 0 machines</div>
+    <div class="info-pill" id="totalCount">🏠 0 villagers</div>
   </div>
 
-  <div class="section-title">🌿 Your machines</div>
+  <div class="section-title">🌿 Your Villagers</div>
   <div class="grid" id="machineGrid"></div>
 
   <div class="log-card">
@@ -302,7 +302,7 @@
   </div>
 
   <div class="add-card">
-    <div class="section-title" style="margin-bottom:16px">✨ Move In a New machine</div>
+    <div class="section-title" style="margin-bottom:16px">✨ Move In a New Villager</div>
     <div class="form-grid">
       <div class="form-group">
         <label>🏷️ Name</label>
@@ -351,6 +351,20 @@ buildFlowers();
 startClock();
 renderAll();
 machines.forEach(m => schedulePing(m.id));
+
+// ── Delegated click handler for all card buttons ──────────────────
+// Handles wake / sleep / reboot / remove without any inline onclick
+// quote-nesting issues.
+document.getElementById('machineGrid').addEventListener('click', function(e) {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn || btn.disabled) return;
+  const id     = parseInt(btn.dataset.id);
+  const action = btn.dataset.action;
+  if      (action === 'wake')   wakeDevice(id);
+  else if (action === 'sleep')  askConfirm(id, 'sleep');
+  else if (action === 'reboot') askConfirm(id, 'reboot');
+  else if (action === 'remove') removeMachine(id);
+});
 
 function buildEmojiPicker() {
   const row = document.getElementById('emojiPicker');
@@ -408,18 +422,20 @@ function renderAll() { renderMachines(); renderLogs(); updateSummary(); }
 function renderMachines(newId) {
   const grid = document.getElementById('machineGrid');
   if (!machines.length) {
-    grid.innerHTML = '<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a machine below.</div>';
+    grid.innerHTML = '<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a villager below.</div>';
     return;
   }
   grid.innerHTML = machines.map(m => cardHTML(m, m.id === newId)).join('');
 }
 
 function makeActionsHTML(id, on) {
+  // Use data-id and data-action attributes to avoid all quote-nesting issues.
+  // A single delegated listener on the grid handles all clicks.
   return (
-    '<button class="btn btn-wake" onclick="wakeDevice(' + id + ')"' + (on ? ' disabled' : '') + '>☀️ Wake</button>' +
-    '<button class="btn btn-sleep" onclick="askConfirm(' + id + ',\"sleep\")"' + (!on ? ' disabled' : '') + '>🌙 Sleep</button>' +
-    '<button class="btn btn-reboot" onclick="askConfirm(' + id + ',\"reboot\")"' + (!on ? ' disabled' : '') + '>🔄 Reboot</button>' +
-    '<button class="btn btn-remove" onclick="removeMachine(' + id + ')" title="Remove">✕</button>'
+    '<button class="btn btn-wake"   data-action="wake"   data-id="' + id + '"' + (on  ? ' disabled' : '') + '>☀️ Wake</button>' +
+    '<button class="btn btn-sleep"  data-action="sleep"  data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🌙 Sleep</button>' +
+    '<button class="btn btn-reboot" data-action="reboot" data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🔄 Reboot</button>' +
+    '<button class="btn btn-remove" data-action="remove" data-id="' + id + '" title="Remove">✕</button>'
   );
 }
 
@@ -488,7 +504,7 @@ function renderLogs() {
 function updateSummary() {
   const on = machines.filter(m => m.status === 'online').length;
   document.getElementById('onlineCount').textContent = '💻 ' + on + ' online';
-  document.getElementById('totalCount').textContent  = '🏠 ' + machines.length + ' machine' + (machines.length !== 1 ? 's' : '');
+  document.getElementById('totalCount').textContent  = '🏠 ' + machines.length + ' villager' + (machines.length !== 1 ? 's' : '');
 }
 
 function addLog(msg, type, icon) {
