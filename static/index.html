@@ -387,6 +387,10 @@ function buildFlowers() {
     totalWidth += 36 + (margin * 2); // emoji ~36px wide + both margins
   }
 }
+window.addEventListener('resize', () => {
+  document.getElementById('flowers').innerHTML = '';
+  buildFlowers();
+});
 
 function startClock() {
   const tick = () => {
