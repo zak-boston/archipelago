@@ -27,7 +27,7 @@ app = Flask(__name__, static_folder="static")
 PORT = 5000
  
 # SSH username used to reach target machines for sleep/reboot.
-SSH_USER = "your_ssh_username"
+SSH_USER = "zak"
  
 # Seconds to wait before declaring a host unreachable.
 PING_TIMEOUT = 2.0
