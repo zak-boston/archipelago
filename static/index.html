@@ -130,10 +130,10 @@
     background: var(--card); border:3px solid var(--border); border-radius:20px;
     padding:18px;
     box-shadow:0 5px 0 var(--border2), 0 7px 18px var(--shadow);
-    transition:transform .15s, box-shadow .15s;
+    transition:transform .15s, box-shadow .15s, border-color .3s;
     position:relative; overflow:hidden;
-    animation: popIn .3s cubic-bezier(.34,1.56,.64,1) both;
   }
+  .machine-card.new-card { animation: popIn .3s cubic-bezier(.34,1.56,.64,1) both; }
   .machine-card:hover { transform:translateY(-2px); box-shadow:0 7px 0 var(--border2), 0 10px 24px var(--shadow2); }
   .machine-card.online  { border-color:#90d878; box-shadow:0 5px 0 #6ab858, 0 7px 18px var(--shadow); }
   .machine-card.offline { border-color:var(--border); }
@@ -340,9 +340,9 @@ const PING_INTERVAL_MS = 15000;
 const EMOJIS = ['🖥️','💻','🎮','🎵','🗄️','📺','🌐','📦','⚡','🔧','🏠','🌿','⭐','🏝️'];
 let selectedEmoji = EMOJIS[0];
 
-let machines  = JSON.parse(localStorage.getItem('arch_machines') || '[]');
-let logs      = [];
-let nextId    = parseInt(localStorage.getItem('arch_nextId') || '1');
+let machines   = JSON.parse(localStorage.getItem('arch_machines') || '[]');
+let logs       = [];
+let nextId     = parseInt(localStorage.getItem('arch_nextId') || '1');
 let pingTimers = {};
 
 // ── Init ──────────────────────────────────────────────────────────
@@ -387,90 +387,98 @@ function startClock() {
 }
 
 // ── Render ────────────────────────────────────────────────────────
+// renderAll does a full rebuild — only called on page load, add, and remove.
+// setStatus does a surgical in-place update so cards never flash.
 function renderAll() { renderMachines(); renderLogs(); updateSummary(); }
 
-function renderMachines() {
+function renderMachines(newId) {
   const grid = document.getElementById('machineGrid');
   if (!machines.length) {
-    grid.innerHTML = `<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a villager below.</div>`;
+    grid.innerHTML = '<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a villager below.</div>';
     return;
   }
-  grid.innerHTML = machines.map((m, i) => `
-    <div class="machine-card ${m.status}" id="card-${m.id}" data-emoji="${m.emoji||'🖥️'}"
-         style="animation-delay:${i*.06}s">
-
-      <!-- Confirmation overlay (hidden by default) -->
-      <div class="card-confirm" id="confirm-${m.id}">
-        <div class="confirm-q" id="confirm-q-${m.id}"></div>
-        <div class="confirm-btns">
-          <button class="confirm-yes" id="confirm-yes-${m.id}">Yes, do it</button>
-          <button class="confirm-no"  onclick="cancelConfirm(${m.id})">Nevermind</button>
-        </div>
-      </div>
-
-      <div class="card-header">
-        <div class="card-icon">${m.emoji||'🖥️'}</div>
-        <div>
-          <div class="card-name">${m.link
-            ? `<a href="${m.link}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid var(--border2);" onmouseover="this.style.borderColor='var(--grass)'" onmouseout="this.style.borderColor='var(--border2)'">${m.name} 🔗</a>`
-            : m.name}</div>
-          <div class="card-role">${m.role}</div>
-        </div>
-      </div>
-      <div class="status-badge ${m.status}">
-        <span class="status-dot"></span>
-        ${statusLabel(m.status)}
-      </div>
-      <div class="card-meta">
-        MAC&nbsp; <span>${m.mac}</span><br>
-        IP&nbsp;&nbsp;&nbsp; <span>${m.ip}</span>
-      </div>
-      <div class="card-ping ${pingClass(m.ping)}">${pingLabel(m.ping)}</div>
-      <div class="card-actions">
-        <button class="btn btn-wake"
-          onclick="wakeDevice(${m.id})"
-          ${m.status==='online' ? 'disabled' : ''}>☀️ Wake</button>
-        <button class="btn btn-sleep"
-          onclick="askConfirm(${m.id},'sleep')"
-          ${m.status!=='online' ? 'disabled' : ''}>🌙 Sleep</button>
-        <button class="btn btn-reboot"
-          onclick="askConfirm(${m.id},'reboot')"
-          ${m.status!=='online' ? 'disabled' : ''}>🔄 Reboot</button>
-        <button class="btn btn-remove"
-          onclick="removeMachine(${m.id})" title="Remove">✕</button>
-      </div>
-    </div>
-  `).join('');
+  grid.innerHTML = machines.map(m => cardHTML(m, m.id === newId)).join('');
 }
 
+function makeActionsHTML(id, on) {
+  return (
+    '<button class="btn btn-wake" onclick="wakeDevice(' + id + ')"' + (on ? ' disabled' : '') + '>☀️ Wake</button>' +
+    '<button class="btn btn-sleep" onclick="askConfirm(' + id + ',\"sleep\")"' + (!on ? ' disabled' : '') + '>🌙 Sleep</button>' +
+    '<button class="btn btn-reboot" onclick="askConfirm(' + id + ',\"reboot\")"' + (!on ? ' disabled' : '') + '>🔄 Reboot</button>' +
+    '<button class="btn btn-remove" onclick="removeMachine(' + id + ')" title="Remove">✕</button>'
+  );
+}
+
+function cardHTML(m, isNew) {
+  const on = m.status === 'online';
+  const nameHTML = m.link
+    ? '<a href="' + m.link + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid #d4bc7a" onmouseover="this.style.borderColor=\'#7ec850\'" onmouseout="this.style.borderColor=\'#d4bc7a\'">' + m.name + ' 🔗</a>'
+    : m.name;
+  return (
+    '<div class="machine-card ' + m.status + (isNew ? ' new-card' : '') + '" id="card-' + m.id + '" data-emoji="' + (m.emoji||'🖥️') + '">' +
+      '<div class="card-confirm" id="confirm-' + m.id + '">' +
+        '<div class="confirm-q" id="confirm-q-' + m.id + '"></div>' +
+        '<div class="confirm-btns">' +
+          '<button class="confirm-yes" id="confirm-yes-' + m.id + '">Yes, do it</button>' +
+          '<button class="confirm-no" onclick="cancelConfirm(' + m.id + ')">Nevermind</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card-header">' +
+        '<div class="card-icon">' + (m.emoji||'🖥️') + '</div>' +
+        '<div>' +
+          '<div class="card-name">' + nameHTML + '</div>' +
+          '<div class="card-role">' + m.role + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="status-badge ' + m.status + '" id="badge-' + m.id + '"><span class="status-dot"></span>' + statusLabel(m.status) + '</div>' +
+      '<div class="card-meta">MAC&nbsp; <span>' + m.mac + '</span><br>IP&nbsp;&nbsp;&nbsp; <span>' + m.ip + '</span></div>' +
+      '<div class="card-ping ' + pingClass(m.ping) + '" id="ping-' + m.id + '">' + pingLabel(m.ping) + '</div>' +
+      '<div class="card-actions" id="actions-' + m.id + '">' + makeActionsHTML(m.id, on) + '</div>' +
+    '</div>'
+  );
+}
+
+function updateCardInPlace(m) {
+  const card = document.getElementById('card-' + m.id);
+  if (!card) return false;
+  card.className = 'machine-card ' + m.status;
+  const badge = document.getElementById('badge-' + m.id);
+  if (badge) { badge.className = 'status-badge ' + m.status; badge.innerHTML = '<span class="status-dot"></span>' + statusLabel(m.status); }
+  const pingEl = document.getElementById('ping-' + m.id);
+  if (pingEl) { pingEl.className = 'card-ping ' + pingClass(m.ping); pingEl.textContent = pingLabel(m.ping); }
+  const actions = document.getElementById('actions-' + m.id);
+  if (actions) actions.innerHTML = makeActionsHTML(m.id, m.status === 'online');
+  return true;
+}
 function statusLabel(s) {
   return {online:'Online 🌿', offline:'Offline 🌑', pinging:'Checking... 🔍'}[s] || s;
 }
-function pingClass(p) { return (!p||p<0)?'none':p<20?'good':'slow'; }
-function pingLabel(p) { return (!p||p<0)?'🏓 Ping: —':`🏓 Ping: ${p}ms`; }
+function pingClass(p) { return (p === null || p === undefined || p < 0) ? 'none' : p < 20 ? 'good' : 'slow'; }
+function pingLabel(p) { return (p === null || p === undefined || p < 0) ? '🏓 Ping: —' : '🏓 Ping: ' + p + 'ms'; }
 
 function renderLogs() {
   const el = document.getElementById('logEntries');
   if (!logs.length) {
-    el.innerHTML = `<div class="log-entry"><span class="log-icon">📭</span><span class="log-msg">Nothing yet today...</span></div>`;
+    el.innerHTML = '<div class="log-entry"><span class="log-icon">📭</span><span class="log-msg">Nothing yet today...</span></div>';
     return;
   }
   el.innerHTML = [...logs].reverse().slice(0,30).map(l =>
-    `<div class="log-entry">
-      <span class="log-icon">${l.icon}</span>
-      <span class="log-time">${l.time}</span>
-      <span class="log-msg ${l.type}">${l.msg}</span>
-    </div>`
+    '<div class="log-entry">' +
+      '<span class="log-icon">' + l.icon + '</span>' +
+      '<span class="log-time">' + l.time + '</span>' +
+      '<span class="log-msg ' + l.type + '">' + l.msg + '</span>' +
+    '</div>'
   ).join('');
 }
 
 function updateSummary() {
-  const on = machines.filter(m => m.status==='online').length;
-  document.getElementById('onlineCount').textContent = `💻 ${on} online`;
-  document.getElementById('totalCount').textContent  = `🏠 ${machines.length} villager${machines.length!==1?'s':''}`;
+  const on = machines.filter(m => m.status === 'online').length;
+  document.getElementById('onlineCount').textContent = '💻 ' + on + ' online';
+  document.getElementById('totalCount').textContent  = '🏠 ' + machines.length + ' villager' + (machines.length !== 1 ? 's' : '');
 }
 
-function addLog(msg, type='ok', icon='📝') {
+function addLog(msg, type, icon) {
+  type = type || 'ok'; icon = icon || '📝';
   logs.push({ time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}), msg, type, icon });
   renderLogs();
 }
@@ -480,115 +488,117 @@ function save() {
   localStorage.setItem('arch_nextId', String(nextId));
 }
 
+// ── Status update — surgical, no full re-render ───────────────────
+function setStatus(id, status, ping) {
+  const m = machines.find(x => x.id === id); if (!m) return;
+  m.status = status;
+  if (ping !== undefined) m.ping = ping;
+  save();
+  // Try surgical update first; fall back to full render if card not in DOM yet
+  if (!updateCardInPlace(m)) renderAll();
+  updateSummary();
+}
+
 // ── Confirm overlay ───────────────────────────────────────────────
 const confirmCfg = {
-  sleep:  { q:'🌙 Really shut this machine down?', cls:'shutdown', label:'🌙 Yes, sleep it',  icon:'🌙', type:'warn' },
-  reboot: { q:'🔄 Really reboot this machine?',    cls:'reboot',   label:'🔄 Yes, reboot it', icon:'🔄', type:'warn' },
+  sleep:  { q:'🌙 Really shut this machine down?', cls:'shutdown', label:'🌙 Yes, sleep it'  },
+  reboot: { q:'🔄 Really reboot this machine?',    cls:'reboot',   label:'🔄 Yes, reboot it' },
 };
 
 function askConfirm(id, action) {
-  const cfg = confirmCfg[action];
-  const overlay  = document.getElementById(`confirm-${id}`);
-  const question = document.getElementById(`confirm-q-${id}`);
-  const yesBtn   = document.getElementById(`confirm-yes-${id}`);
+  const cfg      = confirmCfg[action];
+  const overlay  = document.getElementById('confirm-' + id);
+  const question = document.getElementById('confirm-q-' + id);
+  const yesBtn   = document.getElementById('confirm-yes-' + id);
   question.textContent = cfg.q;
-  yesBtn.className = `confirm-yes ${cfg.cls}`;
+  yesBtn.className  = 'confirm-yes ' + cfg.cls;
   yesBtn.textContent = cfg.label;
-  yesBtn.onclick = () => { cancelConfirm(id); execAction(id, action); };
+  yesBtn.onclick = function() { cancelConfirm(id); execAction(id, action); };
   overlay.classList.add('show');
 }
 
 function cancelConfirm(id) {
-  const overlay = document.getElementById(`confirm-${id}`);
+  const overlay = document.getElementById('confirm-' + id);
   if (overlay) overlay.classList.remove('show');
 }
 
 // ── Wake ──────────────────────────────────────────────────────────
 async function wakeDevice(id) {
-  const m = machines.find(x => x.id===id); if (!m) return;
-  const card = document.getElementById(`card-${id}`);
-  if (card) { card.classList.add('wobble'); setTimeout(()=>card.classList.remove('wobble'),500); }
+  const m = machines.find(x => x.id === id); if (!m) return;
+  const card = document.getElementById('card-' + id);
+  if (card) { card.classList.add('wobble'); setTimeout(function(){ card.classList.remove('wobble'); }, 500); }
   setStatus(id, 'pinging');
-  addLog(`Sending wake-up to ${m.name}...`, 'ok', '☀️');
+  addLog('Sending wake-up to ' + m.name + '...', 'ok', '☀️');
   try {
-    const res  = await fetch(`${API_BASE}/api/wake`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mac:m.mac, ip:m.ip}) });
+    const res  = await fetch(API_BASE + '/api/wake', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mac:m.mac, ip:m.ip}) });
     const data = await res.json();
     if (data.ok) {
-      addLog(`Magic packet sent to ${m.name}! Waiting for response... 🌿`, 'ok', '🌿');
+      addLog('Magic packet sent to ' + m.name + '! Waiting... 🌿', 'ok', '🌿');
       pollUntilOnline(id, 30);
     } else {
-      addLog(`Couldn't wake ${m.name}: ${data.error}`, 'err', '😢');
+      addLog('Could not wake ' + m.name + ': ' + data.error, 'err', '😢');
       setStatus(id, 'offline');
     }
   } catch(e) {
-    addLog(`API error — is the server running?`, 'err', '⚠️');
+    addLog('API error — is the server running?', 'err', '⚠️');
     setStatus(id, 'offline');
   }
 }
 
 // ── Sleep / Reboot ────────────────────────────────────────────────
 async function execAction(id, action) {
-  const m = machines.find(x => x.id===id); if (!m) return;
+  const m = machines.find(x => x.id === id); if (!m) return;
   const isSleep = action === 'sleep';
-  addLog(`${isSleep?'Shutting down':'Rebooting'} ${m.name}...`, 'warn', isSleep?'🌙':'🔄');
+  addLog((isSleep ? 'Shutting down ' : 'Rebooting ') + m.name + '...', 'warn', isSleep ? '🌙' : '🔄');
   setStatus(id, 'pinging');
   try {
     const endpoint = isSleep ? '/api/sleep' : '/api/reboot';
-    const res  = await fetch(`${API_BASE}${endpoint}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:m.ip}) });
+    const res  = await fetch(API_BASE + endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:m.ip}) });
     const data = await res.json();
     if (data.ok) {
-      addLog(`${m.name} is ${isSleep?'going to sleep 💤':'rebooting 🔄'}`, 'warn', isSleep?'🌙':'🔄');
+      addLog(m.name + (isSleep ? ' is going to sleep 💤' : ' is rebooting 🔄'), 'warn', isSleep ? '🌙' : '🔄');
       if (isSleep) {
-        setTimeout(() => { setStatus(id,'offline'); pingDevice(id); }, 8000);
+        setTimeout(function(){ setStatus(id,'offline'); pingDevice(id); }, 8000);
       } else {
-        // Reboot: wait a bit longer then poll
-        setTimeout(() => pollUntilOnline(id, 20), 12000);
+        setTimeout(function(){ pollUntilOnline(id, 20); }, 12000);
       }
     } else {
-      addLog(`Failed on ${m.name}: ${data.error}`, 'err', '😢');
+      addLog('Failed on ' + m.name + ': ' + data.error, 'err', '😢');
       setStatus(id, 'online');
     }
   } catch(e) {
-    addLog(`API error — is the server running?`, 'err', '⚠️');
+    addLog('API error — is the server running?', 'err', '⚠️');
     setStatus(id, 'online');
   }
 }
 
 // ── Ping ──────────────────────────────────────────────────────────
 async function pingDevice(id) {
-  const m = machines.find(x => x.id===id); if (!m) return;
+  const m = machines.find(x => x.id === id); if (!m) return;
   try {
-    const res  = await fetch(`${API_BASE}/api/ping`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:m.ip}) });
+    const res  = await fetch(API_BASE + '/api/ping', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:m.ip}) });
     const data = await res.json();
     const wasOnline = m.status === 'online';
     const nowOnline = data.alive;
-    if (nowOnline && !wasOnline && m.status !== 'pinging') addLog(`${m.name} just came online! 🎉`, 'ok', '🌿');
-    else if (!nowOnline && wasOnline) addLog(`${m.name} went offline.`, 'warn', '🌑');
-    setStatus(id, nowOnline ? 'online' : 'offline', data.ping_ms ?? -1);
-  } catch(e) { /* silent — server may be starting */ }
+    if (nowOnline && !wasOnline && m.status !== 'pinging') addLog(m.name + ' just came online! 🎉', 'ok', '🌿');
+    else if (!nowOnline && wasOnline) addLog(m.name + ' went offline.', 'warn', '🌑');
+    setStatus(id, nowOnline ? 'online' : 'offline', data.ping_ms !== undefined ? data.ping_ms : -1);
+  } catch(e) { /* silent */ }
 }
 
 function schedulePing(id) {
   if (pingTimers[id]) clearInterval(pingTimers[id]);
   pingDevice(id);
-  pingTimers[id] = setInterval(() => pingDevice(id), PING_INTERVAL_MS);
+  pingTimers[id] = setInterval(function(){ pingDevice(id); }, PING_INTERVAL_MS);
 }
 
 function pollUntilOnline(id, left) {
-  if (left <= 0) { addLog(`Gave up waiting for machine to come back.`, 'warn', '⏰'); setStatus(id,'offline'); return; }
-  setTimeout(async () => {
+  if (left <= 0) { addLog('Gave up waiting for machine to come back.', 'warn', '⏰'); setStatus(id,'offline'); return; }
+  setTimeout(async function() {
     await pingDevice(id);
-    const m = machines.find(x => x.id===id);
-    if (m && m.status !== 'online') pollUntilOnline(id, left-1);
+    const m = machines.find(x => x.id === id);
+    if (m && m.status !== 'online') pollUntilOnline(id, left - 1);
   }, 3000);
-}
-
-// ── Status helper ─────────────────────────────────────────────────
-function setStatus(id, status, ping) {
-  const m = machines.find(x => x.id===id); if (!m) return;
-  m.status = status;
-  if (ping !== undefined) m.ping = ping;
-  save(); renderAll();
 }
 
 // ── Add / Remove ──────────────────────────────────────────────────
@@ -599,20 +609,21 @@ function addMachine() {
   const ip   = document.getElementById('inputIp').value.trim();
   const link = document.getElementById('inputLink').value.trim();
   if (!name || !mac || !ip) { addLog('Fill in Name, MAC, and Tailscale IP first! 📋','err','⚠️'); return; }
-  const m = { id:nextId++, name, role:role||'Machine', mac, ip, link: link||'', emoji:selectedEmoji, status:'offline', ping:null };
+  const m = { id:nextId++, name, role:role||'Machine', mac, ip, link:link||'', emoji:selectedEmoji, status:'offline', ping:null };
   machines.push(m); save();
-  addLog(`${name} moved to the archipelago! Welcome! 🎉`, 'ok', '🏝️');
+  addLog(name + ' moved to the archipelago! Welcome! 🎉', 'ok', '🏝️');
+  renderMachines(m.id);
+  updateSummary();
   schedulePing(m.id);
-  ['inputName','inputRole','inputMac','inputIp','inputLink'].forEach(id => document.getElementById(id).value = '');
-  renderAll();
+  ['inputName','inputRole','inputMac','inputIp','inputLink'].forEach(function(fid){ document.getElementById(fid).value = ''; });
 }
 
 function removeMachine(id) {
-  const m = machines.find(x => x.id===id); if (!m) return;
-  if (!confirm(`Move ${m.name} off the archipelago?`)) return;
+  const m = machines.find(x => x.id === id); if (!m) return;
+  if (!confirm('Move ' + m.name + ' off the archipelago?')) return;
   clearInterval(pingTimers[id]); delete pingTimers[id];
-  machines = machines.filter(x => x.id!==id); save();
-  addLog(`${m.name} moved away. We'll miss them! 👋`, 'warn', '🏝️');
+  machines = machines.filter(x => x.id !== id); save();
+  addLog(m.name + ' moved away. We will miss them! 👋', 'warn', '🏝️');
   renderAll();
 }
 </script>
