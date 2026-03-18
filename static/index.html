@@ -340,17 +340,16 @@ const PING_INTERVAL_MS = 15000;
 const EMOJIS = ['🖥️','💻','🎮','🎵','🗄️','📺','🌐','📦','⚡','🔧','🏠','🌿','⭐','🏝️'];
 let selectedEmoji = EMOJIS[0];
 
-let machines   = JSON.parse(localStorage.getItem('arch_machines') || '[]');
+let machines   = [];
 let logs       = [];
-let nextId     = parseInt(localStorage.getItem('arch_nextId') || '1');
+let nextId     = 1;
 let pingTimers = {};
 
 // ── Init ──────────────────────────────────────────────────────────
 buildEmojiPicker();
 buildFlowers();
 startClock();
-renderAll();
-machines.forEach(m => schedulePing(m.id));
+loadMachines();
 
 // ── Delegated click handler for all card buttons ──────────────────
 // Handles wake / sleep / reboot / remove without any inline onclick
@@ -383,28 +382,14 @@ function buildEmojiPicker() {
 
 function buildFlowers() {
   const row = document.getElementById('flowers');
-  const f = ['🌸','🌼','🌺','🌻','🌷'];
-  const targetWidth = window.innerWidth * (3/4);
-  const gap = () => Math.floor(Math.random() * 20 + 8);
-
-  row.style.justifyContent = 'center';
-
-  let totalWidth = 0;
-  while (totalWidth < targetWidth) {
+  const f = ['🌸','🌼','🌺','🌻','🌷','💐','🌸','🌼','🌺','🌷','🌸','🌼','🌺','🌻','🌷','💐','🌸','🌼'];
+  f.forEach(fl => {
     const el = document.createElement('span');
-    el.className = 'flower';
-    el.textContent = f[Math.floor(Math.random() * f.length)];
-    const margin = gap();
-    el.style.marginLeft = margin + 'px';
-    el.style.marginRight = margin + 'px';
+    el.className = 'flower'; el.textContent = fl;
+    el.style.marginLeft = (Math.random() * 30 + 10) + 'px';
     row.appendChild(el);
-    totalWidth += 36 + (margin * 2); // emoji ~36px wide + both margins
-  }
+  });
 }
-window.addEventListener('resize', () => {
-  document.getElementById('flowers').innerHTML = '';
-  buildFlowers();
-});
 
 function startClock() {
   const tick = () => {
@@ -513,9 +498,31 @@ function addLog(msg, type, icon) {
   renderLogs();
 }
 
-function save() {
-  localStorage.setItem('arch_machines', JSON.stringify(machines));
-  localStorage.setItem('arch_nextId', String(nextId));
+async function save() {
+  try {
+    await fetch('/api/machines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(machines)
+    });
+  } catch(e) {
+    console.error('Failed to save machines:', e);
+  }
+}
+
+async function loadMachines() {
+  try {
+    const res  = await fetch('/api/machines');
+    const data = await res.json();
+    machines = data;
+    // Derive nextId from highest existing id
+    nextId = machines.reduce((max, m) => Math.max(max, m.id + 1), 1);
+    renderAll();
+    machines.forEach(m => schedulePing(m.id));
+  } catch(e) {
+    console.error('Failed to load machines:', e);
+    renderAll();
+  }
 }
 
 // ── Status update — surgical, no full re-render ───────────────────
