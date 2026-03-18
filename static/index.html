@@ -645,7 +645,9 @@ function addMachine() {
   const role = document.getElementById('inputRole').value.trim();
   const mac  = document.getElementById('inputMac').value.trim();
   const ip   = document.getElementById('inputIp').value.trim();
-  const link = document.getElementById('inputLink').value.trim();
+  const linkRaw = document.getElementById('inputLink').value.trim();
+  // Ensure the link is absolute so the browser doesn't treat it as relative
+  const link = linkRaw && !linkRaw.match(/^https?:\/\//) ? 'http://' + linkRaw : linkRaw;
   if (!name || !mac || !ip) { addLog('Fill in Name, MAC, and Tailscale IP first! 📋','err','⚠️'); return; }
   const m = { id:nextId++, name, role:role||'Machine', mac, ip, link:link||'', emoji:selectedEmoji, status:'offline', ping:null };
   machines.push(m); save();
