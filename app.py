@@ -30,7 +30,7 @@ app = Flask(__name__, static_folder="static")
 
 PORT = 5000
 
-SSH_USER = "your_ssh_username"
+SSH_USER = "zak"
 
 PING_TIMEOUT = 2.0
 
@@ -91,17 +91,22 @@ def api_ping():
 
 @app.route("/api/wake", methods=["POST"])
 def api_wake():
-    """Send a WOL magic packet to the machine."""
+    """Send a WOL magic packet to the machine.
+
+    Always sends to the subnet broadcast address (e.g. 192.168.1.255)
+    rather than the machine's specific IP. This is more reliable because
+    a powered-off machine can't receive unicast packets, but it can
+    receive broadcast ones via the switch.
+    """
     data = request.get_json()
     mac  = data.get("mac", "").strip()
     ip   = data.get("ip",  "").strip()
     if not mac:
         return jsonify({"ok": False, "error": "No MAC address provided"}), 400
     try:
-        if ip:
-            send_magic_packet(mac, ip_address=ip, port=9)
-        else:
-            send_magic_packet(mac)
+        broadcast = get_broadcast(ip) if ip else "255.255.255.255"
+        send_magic_packet(mac, ip_address=broadcast, port=9)
+        app.logger.info(f"WOL packet sent to {mac} via {broadcast}")
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -128,6 +133,18 @@ def api_reboot():
 
 
 # ── Helpers ───────────────────────────────────────────────────────
+
+def get_broadcast(ip: str) -> str:
+    """
+    Derive the broadcast address from a machine's IP.
+    Assumes a /24 subnet (192.168.1.x → 192.168.1.255).
+    This covers the vast majority of home/homelab setups.
+    """
+    parts = ip.strip().split(".")
+    if len(parts) == 4:
+        return f"{parts[0]}.{parts[1]}.{parts[2]}.255"
+    return "255.255.255.255"
+
 
 def check_host(ip: str) -> tuple[bool, int]:
     """Check if a host is reachable via TCP on common ports."""
