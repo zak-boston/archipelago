@@ -191,8 +191,48 @@
   .btn-sleep:hover:not(:disabled)    { background:#fdecc0; border-color:var(--amber); }
   .btn-reboot { color:#3070a0; border-color:#90c8f0; background:var(--blue-bg);     box-shadow:0 3px 0 #5090c0; }
   .btn-reboot:hover:not(:disabled)   { background:#c8e8fc; border-color:var(--blue); }
+  .btn-edit-card { flex:0; padding:8px 10px; color:var(--blue); border-color:#a0d0f0; background:var(--blue-bg); box-shadow:0 3px 0 #70a8c8; border-radius:12px; font-size:13px; }
+  .btn-edit-card:hover { background:#c8e8fc; }
   .btn-remove { flex:0; padding:8px 10px; color:var(--red); border-color:#f0b0b0; background:var(--red-bg); box-shadow:0 3px 0 #d09090; border-radius:12px; font-size:13px; }
   .btn-remove:hover { background:#fddcdc; }
+
+  /* Inline edit overlay on card */
+  .card-edit {
+    display:none; position:absolute; inset:0; border-radius:18px;
+    background:rgba(255,253,247,.97); backdrop-filter:blur(2px);
+    flex-direction:column; gap:8px; padding:14px; z-index:10;
+    overflow-y:auto;
+    animation:popIn .2s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  .card-edit.show { display:flex; }
+  .card-edit label { font-size:9px; font-weight:800; color:var(--text2); letter-spacing:.06em; text-transform:uppercase; margin-bottom:0; }
+  .card-edit input {
+    background:var(--cream); border:2px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:'Nunito',sans-serif; font-size:11px; font-weight:600;
+    padding:5px 8px; outline:none; width:100%;
+  }
+  .card-edit input:focus { border-color:var(--grass); box-shadow:0 0 0 2px rgba(126,200,80,.18); }
+  .card-edit-emoji { display:flex; gap:5px; flex-wrap:wrap; }
+  .card-edit-emoji span {
+    font-size:16px; cursor:pointer; padding:3px; border-radius:6px;
+    border:2px solid transparent; transition:all .1s;
+  }
+  .card-edit-emoji span:hover { border-color:var(--grass); background:var(--green-ok-bg); }
+  .card-edit-emoji span.sel { border-color:var(--grass); background:var(--green-ok-bg); }
+  .card-edit-actions { display:flex; gap:6px; margin-top:4px; }
+  .btn-save-edit {
+    flex:1; padding:7px; border-radius:10px; border:2.5px solid var(--grass2);
+    background:var(--green-ok-bg); color:#3a883a;
+    font-family:'Nunito',sans-serif; font-size:11px; font-weight:900; cursor:pointer;
+    transition:all .12s;
+  }
+  .btn-save-edit:hover { background:#d0f0d0; }
+  .btn-cancel-edit {
+    flex:1; padding:7px; border-radius:10px; border:2.5px solid var(--border);
+    background:white; color:var(--text2);
+    font-family:'Nunito',sans-serif; font-size:11px; font-weight:900; cursor:pointer;
+  }
+  .btn-cancel-edit:hover { background:var(--cream); }
 
   /* Wobble on wake */
   @keyframes wobble {
@@ -291,19 +331,19 @@
   <div class="info-bar">
     <div class="info-pill" id="clockPill">🕐 --:--</div>
     <div class="info-pill" id="onlineCount">💻 0 online</div>
-    <div class="info-pill" id="totalCount">🏠 0 machines</div>
+    <div class="info-pill" id="totalCount">🏠 0 villagers</div>
   </div>
 
-  <div class="section-title">🌿 Your machines</div>
+  <div class="section-title">🌿 Your Villagers</div>
   <div class="grid" id="machineGrid"></div>
 
   <div class="log-card">
-    <div class="section-title" style="margin-bottom:12px">📜 Bulletin</div>
+    <div class="section-title" style="margin-bottom:12px">📜 Town Bulletin</div>
     <div class="log-entries" id="logEntries"></div>
   </div>
 
   <div class="add-card">
-    <div class="section-title" style="margin-bottom:16px">✨ Move In a New machine</div>
+    <div class="section-title" style="margin-bottom:16px">✨ Move In a New Villager</div>
     <div class="form-grid">
       <div class="form-group">
         <label>🏷️ Name</label>
@@ -318,7 +358,7 @@
         <input type="text" id="inputMac" placeholder="AA:BB:CC:DD:EE:FF">
       </div>
       <div class="form-group">
-        <label>📡 IP Address</label>
+        <label>📡 Tailscale IP</label>
         <input type="text" id="inputIp" placeholder="100.x.x.x">
       </div>
       <div class="form-group" style="grid-column:1/-1">
@@ -360,10 +400,13 @@ document.getElementById('machineGrid').addEventListener('click', function(e) {
   if (!btn || btn.disabled) return;
   const id     = parseInt(btn.dataset.id);
   const action = btn.dataset.action;
-  if      (action === 'wake')   wakeDevice(id);
-  else if (action === 'sleep')  askConfirm(id, 'sleep');
-  else if (action === 'reboot') askConfirm(id, 'reboot');
-  else if (action === 'remove') removeMachine(id);
+  if      (action === 'wake')        wakeDevice(id);
+  else if (action === 'sleep')       askConfirm(id, 'sleep');
+  else if (action === 'reboot')      askConfirm(id, 'reboot');
+  else if (action === 'edit')        openEditCard(id);
+  else if (action === 'save-edit')   saveEditCard(id);
+  else if (action === 'cancel-edit') closeEditCard(id);
+  else if (action === 'remove')      removeMachine(id);
 });
 
 function buildEmojiPicker() {
@@ -408,21 +451,21 @@ function renderAll() { renderMachines(); renderLogs(); updateSummary(); }
 function renderMachines(newId) {
   const grid = document.getElementById('machineGrid');
   if (!machines.length) {
-    grid.innerHTML = '<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a machine below.</div>';
+    grid.innerHTML = '<div class="empty-state"><span class="emoji">🏝️</span>Your archipelago is empty!<br>Add a villager below.</div>';
     return;
   }
   grid.innerHTML = machines.map(m => cardHTML(m, m.id === newId)).join('');
 }
 
 function makeActionsHTML(id, on) {
-  // Use data-id and data-action attributes to avoid all quote-nesting issues.
-  // A single delegated listener on the grid handles all clicks.
   return (
-    '<button class="btn btn-wake"   data-action="wake"   data-id="' + id + '"' + (on  ? ' disabled' : '') + '>☀️ Wake</button>' +
-    '<button class="btn btn-sleep"  data-action="sleep"  data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🌙 Sleep</button>' +
-    '<button class="btn btn-reboot" data-action="reboot" data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🔄 Reboot</button>' +
-    '<button class="btn btn-remove" data-action="remove" data-id="' + id + '" title="Remove">✕</button>'
+    '<button class="btn btn-wake"      data-action="wake"   data-id="' + id + '"' + (on  ? ' disabled' : '') + '>☀️ Wake</button>' +
+    '<button class="btn btn-sleep"     data-action="sleep"  data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🌙 Sleep</button>' +
+    '<button class="btn btn-reboot"    data-action="reboot" data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🔄 Reboot</button>' +
+    '<button class="btn btn-edit-card" data-action="edit"   data-id="' + id + '" title="Edit">✏️</button>' +
+    '<button class="btn btn-remove"    data-action="remove" data-id="' + id + '" title="Remove">✕</button>'
   );
+}
 }
 
 function cardHTML(m, isNew) {
@@ -439,6 +482,7 @@ function cardHTML(m, isNew) {
           '<button class="confirm-no" onclick="cancelConfirm(' + m.id + ')">Nevermind</button>' +
         '</div>' +
       '</div>' +
+      '<div class="card-edit" id="edit-' + m.id + '"></div>' +
       '<div class="card-header">' +
         '<div class="card-icon">' + (m.emoji||'🖥️') + '</div>' +
         '<div>' +
@@ -490,7 +534,7 @@ function renderLogs() {
 function updateSummary() {
   const on = machines.filter(m => m.status === 'online').length;
   document.getElementById('onlineCount').textContent = '💻 ' + on + ' online';
-  document.getElementById('totalCount').textContent  = '🏠 ' + machines.length + ' machine' + (machines.length !== 1 ? 's' : '');
+  document.getElementById('totalCount').textContent  = '🏠 ' + machines.length + ' villager' + (machines.length !== 1 ? 's' : '');
 }
 
 function addLog(msg, type, icon) {
@@ -651,7 +695,7 @@ function addMachine() {
   if (!name || !mac || !ip) { addLog('Fill in Name, MAC, and Tailscale IP first! 📋','err','⚠️'); return; }
   const m = { id:nextId++, name, role:role||'Machine', mac, ip, link:link||'', emoji:selectedEmoji, status:'offline', ping:null };
   machines.push(m); save();
-  addLog(name + ' joined the archipelago! Welcome! 🎉', 'ok', '🏝️');
+  addLog(name + ' moved to the archipelago! Welcome! 🎉', 'ok', '🏝️');
   renderMachines(m.id);
   updateSummary();
   schedulePing(m.id);
@@ -663,8 +707,81 @@ function removeMachine(id) {
   if (!confirm('Move ' + m.name + ' off the archipelago?')) return;
   clearInterval(pingTimers[id]); delete pingTimers[id];
   machines = machines.filter(x => x.id !== id); save();
-  addLog(m.name + ' left the archipelago. Bye! 👋', 'warn', '🏝️');
+  addLog(m.name + ' moved away. We will miss them! 👋', 'warn', '🏝️');
   renderAll();
+}
+
+// ── Edit card ─────────────────────────────────────────────────────
+function openEditCard(id) {
+  const m = machines.find(x => x.id === id); if (!m) return;
+  const overlay = document.getElementById('edit-' + id); if (!overlay) return;
+
+  // Build emoji picker for edit overlay
+  const emojiOptions = EMOJIS.map(e =>
+    '<span data-e="' + e + '" class="' + (e === (m.emoji||'🖥️') ? 'sel' : '') + '">' + e + '</span>'
+  ).join('');
+
+  overlay.innerHTML =
+    '<label>🏷️ Name</label>' +
+    '<input id="ei-name-'  + id + '" value="' + m.name + '">' +
+    '<label>🗂️ Role</label>' +
+    '<input id="ei-role-'  + id + '" value="' + m.role + '">' +
+    '<label>🔌 MAC</label>' +
+    '<input id="ei-mac-'   + id + '" value="' + m.mac  + '">' +
+    '<label>📡 IP</label>' +
+    '<input id="ei-ip-'    + id + '" value="' + m.ip   + '">' +
+    '<label>🔗 Link</label>' +
+    '<input id="ei-link-'  + id + '" value="' + (m.link||'') + '" placeholder="http://...">' +
+    '<label>🎨 Icon</label>' +
+    '<div class="card-edit-emoji" id="ei-emoji-' + id + '">' + emojiOptions + '</div>' +
+    '<div class="card-edit-actions">' +
+      '<button class="btn-save-edit"   data-action="save-edit"   data-id="' + id + '">✓ Save</button>' +
+      '<button class="btn-cancel-edit" data-action="cancel-edit" data-id="' + id + '">✕ Cancel</button>' +
+    '</div>';
+
+  // Emoji selection within overlay
+  overlay.querySelectorAll('.card-edit-emoji span').forEach(el => {
+    el.addEventListener('click', function() {
+      overlay.querySelectorAll('.card-edit-emoji span').forEach(s => s.classList.remove('sel'));
+      this.classList.add('sel');
+    });
+  });
+
+  overlay.classList.add('show');
+}
+
+function saveEditCard(id) {
+  const m = machines.find(x => x.id === id); if (!m) return;
+  const overlay = document.getElementById('edit-' + id); if (!overlay) return;
+
+  const name  = document.getElementById('ei-name-' + id).value.trim();
+  const role  = document.getElementById('ei-role-' + id).value.trim();
+  const mac   = document.getElementById('ei-mac-'  + id).value.trim();
+  const ip    = document.getElementById('ei-ip-'   + id).value.trim();
+  const rawLink = document.getElementById('ei-link-' + id).value.trim();
+  const selEl = overlay.querySelector('.card-edit-emoji span.sel');
+  const emoji = selEl ? selEl.dataset.e : (m.emoji || '🖥️');
+
+  if (!name || !mac || !ip) {
+    alert('Name, MAC, and IP are required!');
+    return;
+  }
+
+  const link = rawLink && !rawLink.match(/^https?:\/\//) ? 'http://' + rawLink : rawLink;
+
+  m.name = name; m.role = role || 'Machine';
+  m.mac  = mac;  m.ip   = ip;
+  m.link = link; m.emoji = emoji;
+
+  save();
+  addLog(m.name + ' updated. 🌿', 'ok', '✏️');
+  closeEditCard(id);
+  renderAll();
+}
+
+function closeEditCard(id) {
+  const overlay = document.getElementById('edit-' + id);
+  if (overlay) overlay.classList.remove('show');
 }
 </script>
 </body>
