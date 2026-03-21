@@ -193,6 +193,8 @@
   .btn-reboot:hover:not(:disabled)   { background:#c8e8fc; border-color:var(--blue); }
   .btn-remove { flex:0; padding:8px 10px; color:var(--red); border-color:#f0b0b0; background:var(--red-bg); box-shadow:0 3px 0 #d09090; border-radius:12px; font-size:13px; }
   .btn-remove:hover { background:#fddcdc; }
+  .btn-edit { flex:0; padding:8px 10px; color:#3070a0; border-color:#90c8f0; background:var(--blue-bg); box-shadow:0 3px 0 #5090c0; border-radius:12px; font-size:13px; }
+  .btn-edit:hover { background:#c8e8fc; }
 
   /* Wobble on wake */
   @keyframes wobble {
@@ -335,6 +337,43 @@
 
 </div>
 
+<!-- ── Edit modal ── -->
+<div id="editModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(100,80,30,.35);backdrop-filter:blur(3px);align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:3px solid var(--border);border-radius:20px;padding:26px 28px;max-width:420px;width:calc(100% - 32px);box-shadow:0 8px 0 var(--border2),0 12px 36px rgba(100,80,30,.22);">
+    <div style="font-size:15px;font-weight:900;color:var(--text);margin-bottom:18px;">✏️ Edit Machine</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>🏷️ Name</label>
+        <input type="text" id="editName" placeholder="e.g. nas-01">
+      </div>
+      <div class="form-group">
+        <label>🗂️ Role</label>
+        <input type="text" id="editRole" placeholder="e.g. NAS, Gaming PC">
+      </div>
+      <div class="form-group">
+        <label>🔌 MAC Address</label>
+        <input type="text" id="editMac" placeholder="AA:BB:CC:DD:EE:FF">
+      </div>
+      <div class="form-group">
+        <label>📡 IP Address</label>
+        <input type="text" id="editIp" placeholder="100.x.x.x">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>🔗 Link <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)">(optional)</span></label>
+        <input type="text" id="editLink" placeholder="http://...">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:18px;">
+      <label>🎨 Pick an icon</label>
+      <div class="emoji-row" id="editEmojiPicker"></div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn-add" style="flex:1" onclick="saveEdit()">💾 Save Changes</button>
+      <button onclick="closeEditModal()" style="padding:12px 16px;border-radius:14px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;border:2.5px solid var(--border);background:white;color:var(--text2);cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_BASE = '';
 const PING_INTERVAL_MS = 15000;
@@ -363,6 +402,7 @@ document.getElementById('machineGrid').addEventListener('click', function(e) {
   if      (action === 'wake')   wakeDevice(id);
   else if (action === 'sleep')  askConfirm(id, 'sleep');
   else if (action === 'reboot') askConfirm(id, 'reboot');
+  else if (action === 'edit')   openEditModal(id);
   else if (action === 'remove') removeMachine(id);
 });
 
@@ -421,6 +461,7 @@ function makeActionsHTML(id, on) {
     '<button class="btn btn-wake"   data-action="wake"   data-id="' + id + '"' + (on  ? ' disabled' : '') + '>☀️ Wake</button>' +
     '<button class="btn btn-sleep"  data-action="sleep"  data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🌙 Sleep</button>' +
     '<button class="btn btn-reboot" data-action="reboot" data-id="' + id + '"' + (!on ? ' disabled' : '') + '>🔄 Reboot</button>' +
+    '<button class="btn btn-edit   btn" data-action="edit"   data-id="' + id + '" title="Edit">✏️</button>' +
     '<button class="btn btn-remove" data-action="remove" data-id="' + id + '" title="Remove">✕</button>'
   );
 }
@@ -638,6 +679,70 @@ function pollUntilOnline(id, left) {
     if (m && m.status !== 'online') pollUntilOnline(id, left - 1);
   }, 3000);
 }
+
+// ── Edit modal ────────────────────────────────────────────────────
+let editingId = null;
+let editSelectedEmoji = EMOJIS[0];
+
+function buildEditEmojiPicker(current) {
+  const row = document.getElementById('editEmojiPicker');
+  row.innerHTML = '';
+  editSelectedEmoji = current || EMOJIS[0];
+  EMOJIS.forEach(e => {
+    const btn = document.createElement('button');
+    btn.className = 'emoji-pick' + (e === editSelectedEmoji ? ' selected' : '');
+    btn.textContent = e; btn.type = 'button';
+    btn.onclick = () => {
+      editSelectedEmoji = e;
+      row.querySelectorAll('.emoji-pick').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+    row.appendChild(btn);
+  });
+}
+
+function openEditModal(id) {
+  const m = machines.find(x => x.id === id); if (!m) return;
+  editingId = id;
+  document.getElementById('editName').value = m.name || '';
+  document.getElementById('editRole').value = m.role || '';
+  document.getElementById('editMac').value  = m.mac  || '';
+  document.getElementById('editIp').value   = m.ip   || '';
+  document.getElementById('editLink').value = m.link || '';
+  buildEditEmojiPicker(m.emoji);
+  const modal = document.getElementById('editModal');
+  modal.style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+  editingId = null;
+}
+
+function saveEdit() {
+  const m = machines.find(x => x.id === editingId); if (!m) return;
+  const name = document.getElementById('editName').value.trim();
+  const mac  = document.getElementById('editMac').value.trim();
+  const ip   = document.getElementById('editIp').value.trim();
+  if (!name || !mac || !ip) { addLog('Name, MAC, and IP are required! 📋', 'err', '⚠️'); return; }
+  const linkRaw = document.getElementById('editLink').value.trim();
+  const link = linkRaw && !linkRaw.match(/^https?:\/\//) ? 'http://' + linkRaw : linkRaw;
+  m.name  = name;
+  m.role  = document.getElementById('editRole').value.trim() || 'Machine';
+  m.mac   = mac;
+  m.ip    = ip;
+  m.link  = link;
+  m.emoji = editSelectedEmoji;
+  save();
+  addLog(name + ' details updated! ✏️', 'ok', '✏️');
+  closeEditModal();
+  renderAll();
+}
+
+// Close modal when clicking the backdrop
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
 
 // ── Add / Remove ──────────────────────────────────────────────────
 function addMachine() {
