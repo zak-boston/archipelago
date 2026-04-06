@@ -1,6 +1,6 @@
 # 🏝️ Archipelago
 
-Animal Crossing-styled homelab control panel.
+homelab control panel.
 Wake, sleep, reboot, and ping machines on your Tailscale network.
 
 ## Folder structure
