@@ -475,7 +475,6 @@ let pingTimers = {};
 
 // ── Init ──────────────────────────────────────────────────────────
 buildEmojiPicker();
-buildDayPicker();
 buildFlowers();
 startClock();
 loadMachines();
@@ -1024,6 +1023,7 @@ const DAY_LABELS = { mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:
 const ACTION_LABELS = { wake:'☀️ Wake', sleep:'🌙 Sleep', reboot:'🔄 Reboot' };
 let selectedDays = [];
 let schedules = [];
+buildDayPicker();
 
 function buildDayPicker() {
   const row = document.getElementById('dayPicker');
