@@ -83,13 +83,5 @@ connection is only used for the management side (ping, sleep, reboot).
 
 ## TODO
 
-✅ Native confirm dialog
-✅ SSH_USER env variable
-✅ Emoji picker modal
-✅ Drag to reorder
-✅ Per-port status monitoring
-✅ Backup & restore
-✅ Search filter
-✅ Scheduled wake/sleep
-⬜ Network scan / device discovery
-⬜ Per-user permissions
+-⬜ Network scan / device discovery
+-⬜ Per-user permissions
