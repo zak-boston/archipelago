@@ -33,6 +33,8 @@ import time
 from flask import (Flask, request, jsonify, send_from_directory,
                    session, redirect, url_for, render_template_string)
 from wakeonlan import send_magic_packet
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 app = Flask(__name__, static_folder="static")
 
@@ -52,6 +54,7 @@ PING_TIMEOUT = 2.0
 CHECK_PORTS = [22, 80, 443]
 
 MACHINES_FILE = "/data/machines.json"
+SCHEDULES_FILE  = "/data/schedules.json"
 
 # Password comes from environment — never hardcode it
 PASSWORD = os.environ.get("ARCHIPELAGO_PASSWORD", "")
@@ -64,6 +67,9 @@ if not PASSWORD:
 # Flask needs a secret key to sign session cookies
 app.secret_key = os.environ.get("ARCHIPELAGO_SECRET", os.urandom(24))
 
+# ── Scheduler ─────────────────────────────────────────────────────
+scheduler = BackgroundScheduler(timezone="UTC")
+scheduler.start()
 
 # ── Auth ──────────────────────────────────────────────────────────
 
@@ -165,11 +171,129 @@ def logout():
     return redirect("/login")
 
 
+# ── Schedule helpers ──────────────────────────────────────────────
+def load_schedules():
+    try:
+        if not os.path.exists(SCHEDULES_FILE):
+            return []
+        with open(SCHEDULES_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_schedules(schedules):
+    os.makedirs(os.path.dirname(SCHEDULES_FILE), exist_ok=True)
+    with open(SCHEDULES_FILE, "w") as f:
+        json.dump(schedules, f, indent=2)
+
+def run_schedule(schedule_id):
+    """Called by APScheduler at the scheduled time."""
+    schedules = load_schedules()
+    s = next((x for x in schedules if x["id"] == schedule_id), None)
+    if not s:
+        return
+    machines = load_machines_data()
+    m = next((x for x in machines if x["id"] == s["machine_id"]), None)
+    if not m:
+        return
+    app.logger.info(f"Running schedule {schedule_id}: {s['action']} on {m['name']}")
+    if s["action"] == "wake":
+        try:
+            broadcast = get_broadcast(m["ip"])
+            send_magic_packet(m["mac"], ip_address=broadcast, port=9)
+        except Exception as e:
+            app.logger.error(f"Schedule wake failed: {e}")
+    elif s["action"] == "sleep":
+        ssh_command(m["ip"], "sudo shutdown -h now")
+    elif s["action"] == "reboot":
+        ssh_command(m["ip"], "sudo shutdown -r now")
+
+def load_machines_data():
+    try:
+        if not os.path.exists(MACHINES_FILE):
+            return []
+        with open(MACHINES_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def days_to_cron(days):
+    """Convert list like ['mon','tue','wed'] to cron day string '0,1,2'."""
+    day_map = {'sun':0,'mon':1,'tue':2,'wed':3,'thu':4,'fri':5,'sat':6}
+    nums = [str(day_map[d]) for d in days if d in day_map]
+    return ','.join(nums) if nums else '*'
+
+def register_schedule(s):
+    """Add or replace an APScheduler job for a schedule entry."""
+    days_cron = days_to_cron(s["days"])
+    hour, minute = s["time"].split(":")
+    scheduler.add_job(
+        run_schedule,
+        CronTrigger(day_of_week=days_cron, hour=int(hour), minute=int(minute)),
+        id=str(s["id"]),
+        args=[s["id"]],
+        replace_existing=True,
+    )
+
+def unregister_schedule(schedule_id):
+    try:
+        scheduler.remove_job(str(schedule_id))
+    except Exception:
+        pass
+
+def reload_all_schedules():
+    """Re-register all saved schedules on startup."""
+    for s in load_schedules():
+        try:
+            register_schedule(s)
+        except Exception as e:
+            app.logger.error(f"Failed to register schedule {s['id']}: {e}")
+
+reload_all_schedules()
+
+
 # ── Frontend ──────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
+
+
+# ── Schedules ─────────────────────────────────────────────────────
+@app.route("/api/schedules", methods=["GET"])
+def get_schedules():
+    return jsonify(load_schedules())
+
+@app.route("/api/schedules", methods=["POST"])
+def create_schedule():
+    try:
+        data = request.get_json()
+        schedules = load_schedules()
+        new_id = max((s["id"] for s in schedules), default=0) + 1
+        s = {
+            "id":         new_id,
+            "machine_id": data["machine_id"],
+            "action":     data["action"],
+            "time":       data["time"],
+            "days":       data["days"],
+        }
+        schedules.append(s)
+        save_schedules(schedules)
+        register_schedule(s)
+        return jsonify({"ok": True, "schedule": s})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/schedules/<int:schedule_id>", methods=["DELETE"])
+def delete_schedule(schedule_id):
+    try:
+        schedules = load_schedules()
+        schedules = [s for s in schedules if s["id"] != schedule_id]
+        save_schedules(schedules)
+        unregister_schedule(schedule_id)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # ── Machines persistence ──────────────────────────────────────────
