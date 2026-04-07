@@ -151,6 +151,24 @@
   .port-chip.selected { border-color:var(--grass2); background:var(--green-ok-bg); color:#3a883a; box-shadow:0 2px 0 #6ab858; }
   .port-custom-row { display:flex; gap:8px; align-items:center; margin-top:6px; }
   .port-custom-row input { width:90px; }
+  .day-chip {
+    padding:4px 10px; border-radius:16px; border:2px solid var(--border);
+    background:var(--cream); font-size:11px; font-weight:800; color:var(--text2);
+    cursor:pointer; transition:all .12s; font-family:'Nunito',sans-serif;
+  }
+  .day-chip:hover { border-color:var(--grass); color:var(--text); }
+  .day-chip.selected { border-color:var(--grass2); background:var(--green-ok-bg); color:#3a883a; box-shadow:0 2px 0 #6ab858; }
+  .schedule-row {
+    background:var(--card); border:2.5px solid var(--border); border-radius:16px;
+    padding:14px 16px; display:flex; align-items:center; gap:12px;
+    box-shadow:0 3px 0 var(--border2), 0 4px 10px var(--shadow);
+  }
+  .schedule-row .sched-icon { font-size:22px; flex-shrink:0; }
+  .schedule-row .sched-info { flex:1; }
+  .schedule-row .sched-name { font-size:13px; font-weight:800; color:var(--text); }
+  .schedule-row .sched-detail { font-size:11px; font-weight:600; color:var(--text3); margin-top:2px; }
+  .schedule-row .sched-del { padding:6px 12px; border-radius:10px; border:2px solid #f0b0b0; background:var(--red-bg); color:#b83030; font-family:'Nunito',sans-serif; font-size:11px; font-weight:800; cursor:pointer; flex-shrink:0; }
+  .schedule-row .sched-del:hover { background:#fddcdc; }
   .machine-card[draggable=true] { cursor: grab; }
   .machine-card[draggable=true]:active { cursor: grabbing; }
   .machine-card.dragging { opacity: .35; transform: scale(.97); box-shadow: none !important; }
@@ -318,6 +336,35 @@
   <div class="section-title">🌿 Your machines</div>
   <div class="grid" id="machineGrid"></div>
 
+  <div class="section-title">⏰ Schedules</div>
+  <div id="scheduleList" style="margin-bottom:16px;display:flex;flex-direction:column;gap:10px;"></div>
+  <div class="add-card" style="margin-bottom:28px;">
+    <div class="section-title" style="margin-bottom:16px;">✨ Add a Schedule</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>💻 Machine</label>
+        <select id="schedMachine" style="background:var(--cream);border:2.5px solid var(--border);border-radius:10px;color:var(--text);font-family:'Nunito',sans-serif;font-size:13px;font-weight:600;padding:9px 12px;outline:none;width:100%;"></select>
+      </div>
+      <div class="form-group">
+        <label>⚡ Action</label>
+        <select id="schedAction" style="background:var(--cream);border:2.5px solid var(--border);border-radius:10px;color:var(--text);font-family:'Nunito',sans-serif;font-size:13px;font-weight:600;padding:9px 12px;outline:none;width:100%;">
+          <option value="wake">☀️ Wake</option>
+          <option value="sleep">🌙 Sleep</option>
+          <option value="reboot">🔄 Reboot</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>🕐 Time</label>
+        <input type="time" id="schedTime" value="08:00">
+      </div>
+      <div class="form-group">
+        <label>📅 Days</label>
+        <div id="dayPicker" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"></div>
+      </div>
+    </div>
+    <button class="btn-add" onclick="addSchedule()">⏰ Add Schedule</button>
+  </div>
+
   <div class="log-card">
     <div class="section-title" style="margin-bottom:12px">📜 Bulletin</div>
     <div class="log-entries" id="logEntries"></div>
@@ -428,9 +475,11 @@ let pingTimers = {};
 
 // ── Init ──────────────────────────────────────────────────────────
 buildEmojiPicker();
+buildDayPicker();
 buildFlowers();
 startClock();
 loadMachines();
+loadSchedules();
 
 // ── Delegated click handler for all card buttons ──────────────────
 // Handles wake / sleep / reboot / remove without any inline onclick
@@ -967,6 +1016,106 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === this) closeRestoreModal();
   });
 });
+
+// ── Schedules ─────────────────────────────────────────────────────
+const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const DAY_LABELS = { mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:'Sat', sun:'Sun' };
+const ACTION_LABELS = { wake:'☀️ Wake', sleep:'🌙 Sleep', reboot:'🔄 Reboot' };
+let selectedDays = [];
+let schedules = [];
+
+function buildDayPicker() {
+  const row = document.getElementById('dayPicker');
+  row.innerHTML = '';
+  DAYS.forEach(d => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'day-chip' + (selectedDays.includes(d) ? ' selected' : '');
+    chip.textContent = DAY_LABELS[d];
+    chip.onclick = () => {
+      const idx = selectedDays.indexOf(d);
+      if (idx === -1) selectedDays.push(d); else selectedDays.splice(idx, 1);
+      buildDayPicker();
+    };
+    row.appendChild(chip);
+  });
+}
+
+function buildMachineSelect() {
+  const sel = document.getElementById('schedMachine');
+  sel.innerHTML = machines.length
+    ? machines.map(m => '<option value="' + m.id + '">' + (m.emoji||'🖥️') + ' ' + m.name + '</option>').join('')
+    : '<option value="">No machines yet</option>';
+}
+
+async function loadSchedules() {
+  try {
+    const res = await fetch('/api/schedules');
+    schedules = await res.json();
+    renderSchedules();
+  } catch(e) { console.error('Failed to load schedules:', e); }
+}
+
+function renderSchedules() {
+  const el = document.getElementById('scheduleList');
+  if (!schedules.length) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:13px;font-weight:700;">No schedules yet — add one below.</div>';
+    return;
+  }
+  el.innerHTML = schedules.map(s => {
+    const m = machines.find(x => x.id === s.machine_id);
+    const name = m ? (m.emoji||'🖥️') + ' ' + m.name : 'Unknown machine';
+    const daysStr = s.days.map(d => DAY_LABELS[d]).join(', ');
+    return (
+      '<div class="schedule-row">' +
+        '<div class="sched-icon">' + (ACTION_LABELS[s.action]||s.action).split(' ')[0] + '</div>' +
+        '<div class="sched-info">' +
+          '<div class="sched-name">' + name + ' — ' + (ACTION_LABELS[s.action]||s.action) + '</div>' +
+          '<div class="sched-detail">⏰ ' + s.time + ' &nbsp;|&nbsp; 📅 ' + daysStr + '</div>' +
+        '</div>' +
+        '<button class="sched-del" onclick="deleteSchedule(' + s.id + ')">✕ Remove</button>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+async function addSchedule() {
+  const machineId = parseInt(document.getElementById('schedMachine').value);
+  const action    = document.getElementById('schedAction').value;
+  const time      = document.getElementById('schedTime').value;
+  if (!machineId || !time || !selectedDays.length) {
+    addLog('Please pick a machine, time, and at least one day! 📋', 'err', '⚠️');
+    return;
+  }
+  try {
+    const res  = await fetch('/api/schedules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ machine_id:machineId, action, time, days:selectedDays })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      schedules.push(data.schedule);
+      renderSchedules();
+      selectedDays = [];
+      buildDayPicker();
+      addLog('Schedule added! ⏰', 'ok', '⏰');
+    }
+  } catch(e) {
+    addLog('Failed to add schedule.', 'err', '⚠️');
+  }
+}
+
+async function deleteSchedule(id) {
+  try {
+    await fetch('/api/schedules/' + id, { method: 'DELETE' });
+    schedules = schedules.filter(s => s.id !== id);
+    renderSchedules();
+    addLog('Schedule removed.', 'warn', '⏰');
+  } catch(e) {
+    addLog('Failed to remove schedule.', 'err', '⚠️');
+  }
+}
 
 // ── Backup & Restore ──────────────────────────────────────────────
 function backupMachines() {
