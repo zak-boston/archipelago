@@ -743,6 +743,9 @@ function saveEdit() {
 document.getElementById('editModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditModal();
 });
+document.getElementById('removeModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRemoveModal();
+});
 
 // ── Add / Remove ──────────────────────────────────────────────────
 function addMachine() {
@@ -763,14 +766,44 @@ function addMachine() {
   ['inputName','inputRole','inputMac','inputIp','inputLink'].forEach(function(fid){ document.getElementById(fid).value = ''; });
 }
 
+let removeTargetId = null;
+
 function removeMachine(id) {
   const m = machines.find(x => x.id === id); if (!m) return;
-  if (!confirm('Move ' + m.name + ' off the archipelago?')) return;
+  removeTargetId = id;
+  document.getElementById('removeModalTitle').textContent = 'Move ' + m.name + ' off the archipelago?';
+  document.getElementById('removeModalSub').textContent = m.role + ' · ' + m.ip;
+  document.getElementById('removeModal').style.display = 'flex';
+}
+
+function closeRemoveModal() {
+  document.getElementById('removeModal').style.display = 'none';
+  removeTargetId = null;
+}
+
+function confirmRemove() {
+  if (!removeTargetId) return;
+  const id = removeTargetId;
+  const m = machines.find(x => x.id === id); if (!m) return;
   clearInterval(pingTimers[id]); delete pingTimers[id];
   machines = machines.filter(x => x.id !== id); save();
   addLog(m.name + ' left the archipelago. Bye! 👋', 'warn', '🏝️');
+  closeRemoveModal();
   renderAll();
 }
 </script>
+
+<div id="removeModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(100,80,30,.35);backdrop-filter:blur(3px);align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:3px solid var(--border);border-radius:20px;padding:24px 26px;max-width:360px;width:calc(100% - 32px);box-shadow:0 8px 0 var(--border2),0 12px 36px rgba(100,80,30,.22);text-align:center;">
+    <div style="font-size:28px;margin-bottom:10px;">🏝️</div>
+    <div style="font-size:14px;font-weight:900;color:var(--text);margin-bottom:6px;" id="removeModalTitle">Remove this machine?</div>
+    <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:20px;font-family:'Nunito Sans',sans-serif;" id="removeModalSub"></div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="confirmRemove()" style="flex:1;padding:11px;border-radius:14px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;border:2.5px solid #f0a0a0;background:var(--red-bg);color:#b83030;cursor:pointer;">👋 Yes, goodbye!</button>
+      <button onclick="closeRemoveModal()" style="flex:1;padding:11px;border-radius:14px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;border:2.5px solid var(--border);background:white;color:var(--text2);cursor:pointer;">Nevermind</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
