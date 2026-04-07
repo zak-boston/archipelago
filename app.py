@@ -40,7 +40,12 @@ app = Flask(__name__, static_folder="static")
 
 PORT = 5000
 
-SSH_USER = "your_ssh_username"
+SSH_USER = os.environ.get("ARCHIPELAGO_SSH_USER", "")
+if not SSH_USER:
+    raise RuntimeError(
+        "ARCHIPELAGO_SSH_USER environment variable is not set. "
+        "Add it to docker-compose.yml under 'environment'."
+    )
 
 PING_TIMEOUT = 2.0
 

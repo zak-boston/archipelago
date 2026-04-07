@@ -5,6 +5,7 @@ services:
     network_mode: host
     environment:
       - ARCHIPELAGO_PASSWORD
+      - ARCHIPELAGO_SSH_USER
     volumes:
       - ~/.ssh:/root/.ssh:ro
       - ./data:/data
