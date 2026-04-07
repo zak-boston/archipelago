@@ -327,7 +327,7 @@
       </div>
       <div class="form-group">
         <label>🗂️ Role</label>
-        <input type="text" id="inputRole" placeholder="e.g. NAS, Gaming PC">
+        <input type="text" id="inputRole" placeholder="e.g. NAS, HPC, Miner">
       </div>
       <div class="form-group">
         <label>🔌 MAC Address</label>
@@ -422,7 +422,6 @@ let nextId     = 1;
 let pingTimers = {};
 
 // ── Init ──────────────────────────────────────────────────────────
-buildPortChips('addPortChips', addSelectedPorts, 'add');
 buildEmojiPicker();
 buildFlowers();
 startClock();
@@ -447,6 +446,7 @@ document.getElementById('machineGrid').addEventListener('click', function(e) {
 const COMMON_PORTS = [22, 80, 443, 8080, 8096, 8123, 9000, 32400];
 let addSelectedPorts  = [];
 let editSelectedPorts = [];
+buildPortChips('addPortChips', addSelectedPorts, 'add');
 
 function buildPortChips(containerId, selectedPorts, context) {
   const row = document.getElementById(containerId);
