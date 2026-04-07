@@ -819,6 +819,7 @@ async function loadMachines() {
     // Derive nextId from highest existing id
     nextId = machines.reduce((max, m) => Math.max(max, m.id + 1), 1);
     renderAll();
+    buildMachineSelect();
     machines.forEach(m => schedulePing(m.id));
   } catch(e) {
     console.error('Failed to load machines:', e);
