@@ -141,6 +141,10 @@
   .machine-card::before { content:attr(data-emoji); position:absolute; top:10px; right:14px; font-size:28px; opacity:.18; }
 
   @keyframes popIn { from{transform:scale(.85);opacity:0} to{transform:scale(1);opacity:1} }
+  .machine-card[draggable=true] { cursor: grab; }
+  .machine-card[draggable=true]:active { cursor: grabbing; }
+  .machine-card.dragging { opacity: .35; transform: scale(.97); box-shadow: none !important; }
+  .machine-card.drag-over { outline: 3px dashed var(--grass); outline-offset: 3px; transform: translateY(-4px) scale(1.02); }
 
   .card-header { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px; }
   .card-icon {
@@ -525,6 +529,13 @@ function renderMachines(newId) {
     return;
   }
   grid.innerHTML = machines.map(m => cardHTML(m, m.id === newId)).join('');
+  grid.querySelectorAll('.machine-card').forEach(card => {
+    card.addEventListener('dragstart', onCardDragStart);
+    card.addEventListener('dragend',   onCardDragEnd);
+    card.addEventListener('dragover',  onCardDragOver);
+    card.addEventListener('dragleave', onCardDragLeave);
+    card.addEventListener('drop',      onCardDrop);
+  });
 }
 
 function makeActionsHTML(id, on) {
@@ -545,7 +556,7 @@ function cardHTML(m, isNew) {
     ? '<a href="' + m.link + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid #d4bc7a" onmouseover="this.style.borderColor=\'#7ec850\'" onmouseout="this.style.borderColor=\'#d4bc7a\'">' + m.name + ' 🔗</a>'
     : m.name;
   return (
-    '<div class="machine-card ' + m.status + (isNew ? ' new-card' : '') + '" id="card-' + m.id + '" data-emoji="' + (m.emoji||'🖥️') + '">' +
+    '<div class="machine-card ' + m.status + (isNew ? ' new-card' : '') + '" id="card-' + m.id + '" data-emoji="' + (m.emoji||'🖥️') + '" draggable="true">' +
       '<div class="card-confirm" id="confirm-' + m.id + '">' +
         '<div class="confirm-q" id="confirm-q-' + m.id + '"></div>' +
         '<div class="confirm-btns">' +
@@ -566,6 +577,46 @@ function cardHTML(m, isNew) {
       '<div class="card-actions" id="actions-' + m.id + '">' + makeActionsHTML(m.id, on) + '</div>' +
     '</div>'
   );
+}
+
+// ── Drag to reorder ───────────────────────────────────────────────
+let dragCardId = null;
+
+function onCardDragStart(e) {
+  dragCardId = parseInt(this.dataset.id || this.id.replace('card-', ''));
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onCardDragEnd(e) {
+  dragCardId = null;
+  this.classList.remove('dragging');
+  document.querySelectorAll('.machine-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+}
+
+function onCardDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const targetId = parseInt(this.dataset.id || this.id.replace('card-', ''));
+  if (targetId !== dragCardId) this.classList.add('drag-over');
+}
+
+function onCardDragLeave(e) {
+  this.classList.remove('drag-over');
+}
+
+function onCardDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  const targetId = parseInt(this.dataset.id || this.id.replace('card-', ''));
+  if (!dragCardId || targetId === dragCardId) return;
+  const fromIdx = machines.findIndex(m => m.id === dragCardId);
+  const toIdx   = machines.findIndex(m => m.id === targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = machines.splice(fromIdx, 1);
+  machines.splice(toIdx, 0, moved);
+  save();
+  renderMachines();
 }
 
 function updateCardInPlace(m) {
