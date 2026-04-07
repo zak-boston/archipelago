@@ -1,6 +1,6 @@
 # 🏝️ Archipelago
 
-Network device control panel.
+WOL cluster manager.
 Wake, sleep, reboot, and ping machines on your network.
 
 ## Folder structure
