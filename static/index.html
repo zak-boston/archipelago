@@ -330,7 +330,10 @@
     </div>
     <div class="form-group" style="margin-bottom:14px">
       <label>🎨 Pick an icon</label>
-      <div class="emoji-row" id="emojiPicker"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="emoji-row" id="emojiPicker"></div>
+        <button type="button" onclick="openEmojiModal('add')" style="padding:4px 10px;border-radius:8px;border:2px dashed var(--border2);background:var(--cream);font-size:11px;font-weight:800;color:var(--text2);cursor:pointer;font-family:'Nunito',sans-serif;">more…</button>
+      </div>
     </div>
     <button class="btn-add" onclick="addMachine()">🏡 Welcome to the Archipelago!</button>
   </div>
@@ -365,7 +368,10 @@
     </div>
     <div class="form-group" style="margin-bottom:18px;">
       <label>🎨 Pick an icon</label>
-      <div class="emoji-row" id="editEmojiPicker"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="emoji-row" id="editEmojiPicker"></div>
+        <button type="button" onclick="openEmojiModal('edit')" style="padding:4px 10px;border-radius:8px;border:2px dashed var(--border2);background:var(--cream);font-size:11px;font-weight:800;color:var(--text2);cursor:pointer;font-family:'Nunito',sans-serif;">more…</button>
+      </div>
     </div>
     <div style="display:flex;gap:10px;">
       <button class="btn-add" style="flex:1" onclick="saveEdit()">💾 Save Changes</button>
@@ -377,7 +383,7 @@
 <script>
 const API_BASE = '';
 const PING_INTERVAL_MS = 15000;
-const EMOJIS = ['🖥️','💻','🎮','🎵','🗄️','📺','🌐','📦','⚡','🔧','🏠','🌿','⭐','🏝️'];
+const EMOJIS = ['🎬','🎵','📺','💾','📊','🖥️','💻','🌐','📦','⭐','🏝️'];
 let selectedEmoji = EMOJIS[0];
 
 let machines   = [];
@@ -405,6 +411,59 @@ document.getElementById('machineGrid').addEventListener('click', function(e) {
   else if (action === 'edit')   openEditModal(id);
   else if (action === 'remove') removeMachine(id);
 });
+
+const EMOJI_CATEGORIES = [
+  { label: '⭐ Favourites',  emojis: ['⭐','🔥','💎','🏆','🎯','✨','💡','🔑'] },
+  { label: '💻 Tech',        emojis: ['🖥️','💻','📱','⌨️','🖱️','🖨️','💾','💿','📡','🔌','🔋','📶','🛜','🧮','⚙️','🔧','🔩','🛠️'] },
+  { label: '🎬 Media',       emojis: ['🎬','📺','🎵','🎧','🎙️','📻','🎮','🕹️','📷','📸','📽️','🎞️','🎭','🎨'] },
+  { label: '🏠 Home',        emojis: ['🏠','🏡','🛋️','🪑','🛏️','🚪','🪟','💡','🔦','🕯️','🧹','🪣','🧺','🪴'] },
+  { label: '📦 Files',       emojis: ['📦','📁','📂','🗂️','📄','📋','📊','📈','📉','🗄️','🗃️','📰','📚','📖','📝'] },
+  { label: '🌿 Nature',      emojis: ['🌿','🌱','🌳','🌲','🍀','🌸','🌺','🌻','🌙','☀️','🌈','❄️','🔥','💧','🌊','🏝️','⛅','🌍'] },
+  { label: '🔒 Security',    emojis: ['🔒','🔓','🔐','🛡️','🔑','🗝️','👁️','⚠️','🚨','🚦'] },
+  { label: '🚀 Network',     emojis: ['🚀','🛰️','📡','🌐','🔗','⛓️','🗺️','🧭','📍','🏴'] },
+  { label: '🧸 Fun',         emojis: ['🧸','🎲','🧩','🎪','🎠','🪆','🎁','🎀','🪄','🎩','🃏','♟️'] },
+];
+
+let emojiModalCaller = 'add';
+
+function openEmojiModal(caller) {
+  emojiModalCaller = caller;
+  const body = document.getElementById('emojiModalBody');
+  body.innerHTML = '';
+  EMOJI_CATEGORIES.forEach(cat => {
+    const heading = document.createElement('div');
+    heading.style.cssText = 'font-size:11px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--border);';
+    heading.textContent = cat.label;
+    body.appendChild(heading);
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+    cat.emojis.forEach(e => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'emoji-pick';
+      btn.textContent = e;
+      btn.onclick = () => selectEmojiFromModal(e);
+      grid.appendChild(btn);
+    });
+    body.appendChild(grid);
+  });
+  document.getElementById('emojiModal').style.display = 'flex';
+}
+
+function closeEmojiModal() {
+  document.getElementById('emojiModal').style.display = 'none';
+}
+
+function selectEmojiFromModal(e) {
+  if (emojiModalCaller === 'edit') {
+    editSelectedEmoji = e;
+    document.querySelectorAll('#editEmojiPicker .emoji-pick').forEach(b => b.classList.remove('selected'));
+  } else {
+    selectedEmoji = e;
+    document.querySelectorAll('#emojiPicker .emoji-pick').forEach(b => b.classList.remove('selected'));
+  }
+  closeEmojiModal();
+}
 
 function buildEmojiPicker() {
   const row = document.getElementById('emojiPicker');
@@ -761,6 +820,9 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('removeModal').addEventListener('click', function(e) {
     if (e.target === this) closeRemoveModal();
   });
+  document.getElementById('emojiModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEmojiModal();
+  });
 });
 
 // ── Add / Remove ──────────────────────────────────────────────────
@@ -808,6 +870,16 @@ function confirmRemove() {
   renderAll();
 }
 </script>
+
+<div id="emojiModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(100,80,30,.35);backdrop-filter:blur(3px);align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:3px solid var(--border);border-radius:20px;padding:24px 26px;max-width:480px;width:calc(100% - 32px);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 0 var(--border2),0 12px 36px rgba(100,80,30,.22);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:900;color:var(--text);">🎨 Choose an Icon</div>
+      <button onclick="closeEmojiModal()" style="padding:4px 12px;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;border:2px solid var(--border);background:var(--cream);color:var(--text2);cursor:pointer;">✕ Close</button>
+    </div>
+    <div id="emojiModalBody" style="overflow-y:auto;flex:1;padding-right:4px;"></div>
+  </div>
+</div>
 
 <div id="removeModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(100,80,30,.35);backdrop-filter:blur(3px);align-items:center;justify-content:center;">
   <div style="background:var(--card);border:3px solid var(--border);border-radius:20px;padding:24px 26px;max-width:360px;width:calc(100% - 32px);box-shadow:0 8px 0 var(--border2),0 12px 36px rgba(100,80,30,.22);text-align:center;">
