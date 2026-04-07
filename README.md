@@ -1,7 +1,7 @@
 # 🏝️ Archipelago
 
-homelab control panel.
-Wake, sleep, reboot, and ping machines on your Tailscale network.
+Network device control panel.
+Wake, sleep, reboot, and ping machines on your network.
 
 ## Folder structure
 
@@ -27,15 +27,7 @@ Then open **http://localhost:5000** (or your Tailscale IP on port 5000).
 
 ## One-time setup
 
-### 1. Set your SSH username
-
-Edit `app.py` and change this line near the top:
-
-```python
-SSH_USER = "your_ssh_username"
-```
-
-### 2. Set up SSH keys
+### 1. Set up SSH keys
 
 Archipelago SSHes into your machines to run shutdown/reboot.
 Run these commands **on the machine that will run Archipelago**:
@@ -48,7 +40,7 @@ ssh-keygen -t ed25519
 ssh-copy-id your_user@100.x.x.x
 ```
 
-### 3. Allow passwordless shutdown on each target machine
+### 2. Allow passwordless shutdown on each target machine
 
 On each machine you want to sleep/reboot, run `sudo visudo` and add:
 
@@ -56,10 +48,11 @@ On each machine you want to sleep/reboot, run `sudo visudo` and add:
 your_user ALL=(ALL) NOPASSWD: /sbin/shutdown
 ```
 
-### 4. WOL — make sure it's enabled in BIOS
+### 3. WOL — make sure it's enabled in BIOS
 
 In your machine's BIOS/UEFI settings, look for:
 - "Wake on LAN" → Enabled
+- "After Power Loss" → "Power On"
 - "ERP" or "ErP Ready" → Disabled (this disables WOL if enabled)
 
 ---
