@@ -83,5 +83,6 @@ connection is only used for the management side (ping, sleep, reboot).
 
 ## TODO
 
--⬜ Network scan / device discovery
--⬜ Per-user permissions
+⬜ Network scan / device discovery
+
+⬜ Per-user permissions
