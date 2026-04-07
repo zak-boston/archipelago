@@ -1,7 +1,7 @@
 # 🏝️ Archipelago
  
 A homelab control panel for your network.
-Wake, sleep, reboot, ping, and schedule machines — all from a cosy island-themed UI.
+Wake, sleep, reboot, ping, and schedule machines.
  
 ## Folder structure
  
