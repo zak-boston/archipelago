@@ -203,10 +203,12 @@ def save_machines():
 
 @app.route("/api/ping", methods=["POST"])
 def api_ping():
-    ip = request.get_json().get("ip", "").strip()
+    data = request.get_json()
+    ip    = data.get("ip", "").strip()
+    ports = data.get("ports", [])
     if not ip:
         return jsonify({"error": "No IP provided"}), 400
-    alive, ping_ms = check_host(ip)
+    alive, ping_ms = check_host(ip, ports if ports else CHECK_PORTS)
     return jsonify({"alive": alive, "ping_ms": ping_ms})
 
 
@@ -253,9 +255,9 @@ def get_broadcast(ip: str) -> str:
     return "255.255.255.255"
 
 
-def check_host(ip: str) -> tuple[bool, int]:
+def check_host(ip: str, ports: list = CHECK_PORTS) -> tuple[bool, int]:
     start = time.time()
-    for port in CHECK_PORTS:
+    for port in ports:
         try:
             with socket.create_connection((ip, port), timeout=PING_TIMEOUT):
                 ms = int((time.time() - start) * 1000)

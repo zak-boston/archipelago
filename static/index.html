@@ -141,6 +141,16 @@
   .machine-card::before { content:attr(data-emoji); position:absolute; top:10px; right:14px; font-size:28px; opacity:.18; }
 
   @keyframes popIn { from{transform:scale(.85);opacity:0} to{transform:scale(1);opacity:1} }
+  .port-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+  .port-chip {
+    padding:4px 10px; border-radius:16px; border:2px solid var(--border);
+    background:var(--cream); font-size:11px; font-weight:800; color:var(--text2);
+    cursor:pointer; transition:all .12s; font-family:'Nunito',sans-serif;
+  }
+  .port-chip:hover { border-color:var(--grass); color:var(--text); }
+  .port-chip.selected { border-color:var(--grass2); background:var(--green-ok-bg); color:#3a883a; box-shadow:0 2px 0 #6ab858; }
+  .port-custom-row { display:flex; gap:8px; align-items:center; margin-top:6px; }
+  .port-custom-row input { width:90px; }
   .machine-card[draggable=true] { cursor: grab; }
   .machine-card[draggable=true]:active { cursor: grabbing; }
   .machine-card.dragging { opacity: .35; transform: scale(.97); box-shadow: none !important; }
@@ -331,6 +341,14 @@
         <label>🔗 Link <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — e.g. http://100.x.x.x:8080)</span></label>
         <input type="text" id="inputLink" placeholder="http://...">
       </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>🔌 Ports to monitor <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — falls back to 22, 80, 443)</span></label>
+        <div class="port-chips" id="addPortChips"></div>
+        <div class="port-custom-row">
+          <input type="text" id="addPortCustom" placeholder="custom port..." style="width:130px;">
+          <button type="button" onclick="addCustomPort('add')" style="padding:7px 13px;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:2px solid var(--grass2);background:var(--grass);color:white;cursor:pointer;">+ Add</button>
+        </div>
+      </div>
     </div>
     <div class="form-group" style="margin-bottom:14px">
       <label>🎨 Pick an icon</label>
@@ -369,6 +387,14 @@
         <label>🔗 Link <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)">(optional)</span></label>
         <input type="text" id="editLink" placeholder="http://...">
       </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>🔌 Ports to monitor <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — falls back to 22, 80, 443)</span></label>
+        <div class="port-chips" id="editPortChips"></div>
+        <div class="port-custom-row">
+          <input type="text" id="editPortCustom" placeholder="custom port..." style="width:130px;">
+          <button type="button" onclick="addCustomPort('edit')" style="padding:7px 13px;border-radius:8px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;border:2px solid var(--grass2);background:var(--grass);color:white;cursor:pointer;">+ Add</button>
+        </div>
+      </div>
     </div>
     <div class="form-group" style="margin-bottom:18px;">
       <label>🎨 Pick an icon</label>
@@ -396,6 +422,7 @@ let nextId     = 1;
 let pingTimers = {};
 
 // ── Init ──────────────────────────────────────────────────────────
+buildPortChips('addPortChips', addSelectedPorts, 'add');
 buildEmojiPicker();
 buildFlowers();
 startClock();
@@ -415,6 +442,51 @@ document.getElementById('machineGrid').addEventListener('click', function(e) {
   else if (action === 'edit')   openEditModal(id);
   else if (action === 'remove') removeMachine(id);
 });
+
+// ── Port chips ────────────────────────────────────────────────────
+const COMMON_PORTS = [22, 80, 443, 8080, 8096, 8123, 9000, 32400];
+let addSelectedPorts  = [];
+let editSelectedPorts = [];
+
+function buildPortChips(containerId, selectedPorts, context) {
+  const row = document.getElementById(containerId);
+  row.innerHTML = '';
+  // Common port chips
+  COMMON_PORTS.forEach(p => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'port-chip' + (selectedPorts.includes(p) ? ' selected' : '');
+    chip.textContent = p;
+    chip.onclick = () => togglePort(p, context);
+    row.appendChild(chip);
+  });
+  // Any custom ports already selected that aren't in COMMON_PORTS
+  selectedPorts.filter(p => !COMMON_PORTS.includes(p)).forEach(p => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'port-chip selected';
+    chip.textContent = p;
+    chip.onclick = () => togglePort(p, context);
+    row.appendChild(chip);
+  });
+}
+
+function togglePort(port, context) {
+  const arr = context === 'edit' ? editSelectedPorts : addSelectedPorts;
+  const idx = arr.indexOf(port);
+  if (idx === -1) arr.push(port); else arr.splice(idx, 1);
+  buildPortChips(context === 'edit' ? 'editPortChips' : 'addPortChips', arr, context);
+}
+
+function addCustomPort(context) {
+  const inputId = context === 'edit' ? 'editPortCustom' : 'addPortCustom';
+  const val = parseInt(document.getElementById(inputId).value.trim());
+  if (!val || val < 1 || val > 65535) return;
+  const arr = context === 'edit' ? editSelectedPorts : addSelectedPorts;
+  if (!arr.includes(val)) arr.push(val);
+  document.getElementById(inputId).value = '';
+  buildPortChips(context === 'edit' ? 'editPortChips' : 'addPortChips', arr, context);
+}
 
 const EMOJI_CATEGORIES = [
   { label: '⭐ Favourites',  emojis: ['⭐','🔥','💎','🏆','🎯','✨','💡','🔑'] },
@@ -572,7 +644,7 @@ function cardHTML(m, isNew) {
         '</div>' +
       '</div>' +
       '<div class="status-badge ' + m.status + '" id="badge-' + m.id + '"><span class="status-dot"></span>' + statusLabel(m.status) + '</div>' +
-      '<div class="card-meta">MAC&nbsp; <span>' + m.mac + '</span><br>IP&nbsp;&nbsp;&nbsp; <span>' + m.ip + '</span></div>' +
+      '<div class="card-meta">MAC&nbsp; <span>' + m.mac + '</span><br>IP&nbsp;&nbsp;&nbsp; <span>' + m.ip + '</span>' + (m.ports && m.ports.length ? '<br>Ports <span>' + m.ports.join(', ') + '</span>' : '') + '</div>' +
       '<div class="card-ping ' + pingClass(m.ping) + '" id="ping-' + m.id + '">' + pingLabel(m.ping) + '</div>' +
       '<div class="card-actions" id="actions-' + m.id + '">' + makeActionsHTML(m.id, on) + '</div>' +
     '</div>'
@@ -779,7 +851,7 @@ async function execAction(id, action) {
 async function pingDevice(id) {
   const m = machines.find(x => x.id === id); if (!m) return;
   try {
-    const res  = await fetch(API_BASE + '/api/ping', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:m.ip}) });
+    const res  = await fetch(API_BASE + '/api/ping', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:m.ip, ports:m.ports||[]}) });
     const data = await res.json();
     const wasOnline = m.status === 'online';
     const nowOnline = data.alive;
@@ -833,6 +905,8 @@ function openEditModal(id) {
   document.getElementById('editMac').value  = m.mac  || '';
   document.getElementById('editIp').value   = m.ip   || '';
   document.getElementById('editLink').value = m.link || '';
+  editSelectedPorts = (m.ports || []).slice();
+  buildPortChips('editPortChips', editSelectedPorts, 'edit');
   buildEditEmojiPicker(m.emoji);
   const modal = document.getElementById('editModal');
   modal.style.display = 'flex';
@@ -856,6 +930,7 @@ function saveEdit() {
   m.mac   = mac;
   m.ip    = ip;
   m.link  = link;
+  m.ports = editSelectedPorts.slice();
   m.emoji = editSelectedEmoji;
   save();
   addLog(name + ' details updated! ✏️', 'ok', '✏️');
@@ -886,8 +961,10 @@ function addMachine() {
   // Ensure the link is absolute so the browser doesn't treat it as relative
   const link = linkRaw && !linkRaw.match(/^https?:\/\//) ? 'http://' + linkRaw : linkRaw;
   if (!name || !mac || !ip) { addLog('Fill in Name, MAC, and Tailscale IP first! 📋','err','⚠️'); return; }
-  const m = { id:nextId++, name, role:role||'Machine', mac, ip, link:link||'', emoji:selectedEmoji, status:'offline', ping:null };
+  const m = { id:nextId++, name, role:role||'Machine', mac, ip, link:link||'', emoji:selectedEmoji, ports:addSelectedPorts.slice(), status:'offline', ping:null };
   machines.push(m); save();
+  addSelectedPorts = [];
+  buildPortChips('addPortChips', addSelectedPorts, 'add');
   addLog(name + ' joined the archipelago! Welcome! 🎉', 'ok', '🏝️');
   renderMachines(m.id);
   updateSummary();
