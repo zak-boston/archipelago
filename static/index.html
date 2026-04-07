@@ -308,6 +308,9 @@
     <div class="info-pill" id="clockPill">🕐 --:--</div>
     <div class="info-pill" id="onlineCount">💻 0 online</div>
     <div class="info-pill" id="totalCount">🏠 0 machines</div>
+    <div class="info-pill" style="padding:3px 8px;">
+      <input id="searchInput" type="text" placeholder="🔍 search..." onkeyup="filterMachines()" style="background:transparent;border:none;color:var(--text);font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;outline:none;width:120px;">
+    </div>
     <button class="info-pill" onclick="backupMachines()" style="cursor:pointer;border:2px solid var(--border);background:var(--card);">💾 Backup</button>
     <button class="info-pill" onclick="openRestoreModal()" style="cursor:pointer;border:2px solid var(--border);background:var(--card);">📂 Restore</button>
   </div>
@@ -595,6 +598,15 @@ function startClock() {
 // renderAll does a full rebuild — only called on page load, add, and remove.
 // setStatus does a surgical in-place update so cards never flash.
 function renderAll() { renderMachines(); renderLogs(); updateSummary(); }
+
+function filterMachines() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  document.querySelectorAll('.machine-card').forEach(card => {
+    const name = (card.querySelector('.card-name')?.textContent || '').toLowerCase();
+    const role = (card.querySelector('.card-role')?.textContent || '').toLowerCase();
+    card.style.display = (!query || name.includes(query) || role.includes(query)) ? '' : 'none';
+  });
+}
 
 function renderMachines(newId) {
   const grid = document.getElementById('machineGrid');
