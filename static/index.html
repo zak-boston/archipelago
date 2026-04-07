@@ -743,8 +743,10 @@ function saveEdit() {
 document.getElementById('editModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditModal();
 });
-document.getElementById('removeModal').addEventListener('click', function(e) {
-  if (e.target === this) closeRemoveModal();
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('removeModal').addEventListener('click', function(e) {
+    if (e.target === this) closeRemoveModal();
+  });
 });
 
 // ── Add / Remove ──────────────────────────────────────────────────
