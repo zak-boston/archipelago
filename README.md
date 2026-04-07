@@ -80,3 +80,16 @@ a broadcast address. This is more reliable and avoids subnet/router issues.
 
 The machine still needs to support WOL at the hardware level. The Tailscale
 connection is only used for the management side (ping, sleep, reboot).
+
+## TODO
+
+✅ Native confirm dialog
+✅ SSH_USER env variable
+✅ Emoji picker modal
+✅ Drag to reorder
+✅ Per-port status monitoring
+✅ Backup & restore
+✅ Search filter
+✅ Scheduled wake/sleep
+⬜ Network scan / device discovery
+⬜ Per-user permissions
