@@ -305,7 +305,7 @@
   </div>
 
   <div class="add-card">
-    <div class="section-title" style="margin-bottom:16px">✨ Move In a New machine</div>
+    <div class="section-title" style="margin-bottom:16px">✨ Add a New island to the Archipelago</div>
     <div class="form-grid">
       <div class="form-group">
         <label>🏷️ Name</label>
@@ -423,14 +423,28 @@ function buildEmojiPicker() {
 
 function buildFlowers() {
   const row = document.getElementById('flowers');
-  const f = ['🌸','🌼','🌺','🌻','🌷','💐','🌸','🌼','🌺','🌷','🌸','🌼','🌺','🌻','🌷','💐','🌸','🌼'];
-  f.forEach(fl => {
+  const f = ['🌸','🌼','🌺','🌻','🌷'];
+  const targetWidth = window.innerWidth * (3/4);
+  const gap = () => Math.floor(Math.random() * 20 + 8);
+
+  row.style.justifyContent = 'center';
+
+  let totalWidth = 0;
+  while (totalWidth < targetWidth) {
     const el = document.createElement('span');
-    el.className = 'flower'; el.textContent = fl;
-    el.style.marginLeft = (Math.random() * 30 + 10) + 'px';
+    el.className = 'flower';
+    el.textContent = f[Math.floor(Math.random() * f.length)];
+    const margin = gap();
+    el.style.marginLeft = margin + 'px';
+    el.style.marginRight = margin + 'px';
     row.appendChild(el);
-  });
+    totalWidth += 36 + (margin * 2); // emoji ~36px wide + both margins
+  }
 }
+window.addEventListener('resize', () => {
+  document.getElementById('flowers').innerHTML = '';
+  buildFlowers();
+});
 
 function startClock() {
   const tick = () => {
