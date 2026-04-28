@@ -2,7 +2,13 @@
  
 A homelab control panel for your network.
 Wake, sleep, reboot, ping, and schedule machines.
- 
+
+---
+
+<img width="1902" height="956" alt="image" src="https://github.com/user-attachments/assets/61f175e2-299b-465c-a9dd-f506a3a1e824" />
+
+---
+
 ## Folder structure
  
 ```
