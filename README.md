@@ -145,6 +145,7 @@ Your data in `./data/` is untouched by rebuilds.
  
 ## TODO
  
+- ⬜ Fix scheduling bug
 - ⬜ Network scan / device discovery (requires nmap)
 - ⬜ Per-user per-device permissions
 - ⬜ Themes
